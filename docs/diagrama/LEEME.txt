@@ -1,0 +1,6 @@
+Antes de entregar:
+1. Abran FoodGo_Arquitectura.drawio en https://app.diagrams.net (Open Existing Diagram).
+2. Ajusten lo que necesiten (iconos AWS, colores, distribución).
+3. Exporten como PNG (File > Export as > PNG) y guárdenlo en esta misma carpeta como
+   FoodGo_Arquitectura.png.
+4. Ese PNG es el que se copia directamente en AVA junto con los enlaces de GitHub.
