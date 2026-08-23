@@ -14,8 +14,8 @@ Encargo (diagrama) + Presentación (video), trabajo en parejas.
 
 | Nombre | Rol en la entrega |
 |---|---|
-| _(completar)_ | _(ej. diagrama / código)_ |
-| _(completar)_ | _(ej. video / documentación)_ |
+| _Jhohan Ramírez_ | _(ej. diagrama / código)_ |
+| _Alex Llanten_ | _(ej. video / documentación)_ |
 
 ## 2. El caso: FoodGo
 
