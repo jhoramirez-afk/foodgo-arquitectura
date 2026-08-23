@@ -141,15 +141,15 @@ Cliente confirma pedido
 Diagrama: [imagen PNG adjunta, exportada de docs/diagrama/FoodGo_Arquitectura.drawio]
 
 Repositorios (9 enlaces):
-- Arquitectura (este repo): https://github.com/<usuario>/foodgo-arquitectura
-- ms-usuarios:               https://github.com/<usuario>/foodgo-ms-usuarios
-- ms-restaurantes:            https://github.com/<usuario>/foodgo-ms-restaurantes
-- ms-pedidos:                 https://github.com/<usuario>/foodgo-ms-pedidos
-- ms-pagos:                   https://github.com/<usuario>/foodgo-ms-pagos
-- ms-delivery:                https://github.com/<usuario>/foodgo-ms-delivery
-- ms-notificaciones:          https://github.com/<usuario>/foodgo-ms-notificaciones
-- ms-cupones:                 https://github.com/<usuario>/foodgo-ms-cupones
-- ms-resenas:                 https://github.com/<usuario>/foodgo-ms-resenas
+- Arquitectura (este repo): https://github.com/jhoramirez-afk/foodgo-arquitectura
+- ms-usuarios:               https://github.com/jhoramirez-afk/foodgo-ms-usuarios
+- ms-restaurantes:            https://github.com/jhoramirez-afk/foodgo-ms-restaurantes
+- ms-pedidos:                 https://github.com/jhoramirez-afk/foodgo-ms-pedidos
+- ms-pagos:                   https://github.com/jhoramirez-afk/foodgo-ms-pagos
+- ms-delivery:                https://github.com/jhoramirez-afk/foodgo-ms-delivery
+- ms-notificaciones:          https://github.com/jhoramirez-afk/foodgo-ms-notificaciones
+- ms-cupones:                 https://github.com/jhoramirez-afk/foodgo-ms-cupones
+- ms-resenas:                 https://github.com/jhoramirez-afk/foodgo-ms-resenas
 
 Video: [archivo adjunto o enlace]
 ```
