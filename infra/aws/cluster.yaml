@@ -1,0 +1,695 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: FoodGo EP03 - Swarm privado con dos nodos en AWS Academy Learner Lab.
+  No crea roles IAM.
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC existente del Learner Lab.
+  SubnetA:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subred con salida a Internet, primera zona.
+  SubnetB:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subred con salida a Internet, otra zona.
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+    - t3.medium
+    Description: Dos nodos de 4 GB; no se crean instancias adicionales.
+  InstanceProfileName:
+    Type: String
+    Default: LabInstanceProfile
+    AllowedValues:
+    - LabInstanceProfile
+  LinuxAmi:
+    Type: AWS::EC2::Image::Id
+    Description: AMI fijada al crear el cluster; conservar su valor en actualizaciones.
+Resources:
+  SwarmSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'FoodGo: nodos Swarm, acceso externo solo desde ALB privado'
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-swarm
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'FoodGo: ALB interno'
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        DestinationSecurityGroupId:
+          Ref: SwarmSecurityGroup
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-alb
+  GatewaySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'FoodGo: gateway hacia ALB interno'
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        DestinationSecurityGroupId:
+          Ref: AlbSecurityGroup
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-gateway
+  GatewaySecurityGroupToAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: AlbSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId:
+        Ref: GatewaySecurityGroup
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'FoodGo: lambda hacia ALB interno'
+      VpcId:
+        Ref: VpcId
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        DestinationSecurityGroupId:
+          Ref: AlbSecurityGroup
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-lambda
+  LambdaSecurityGroupToAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: AlbSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId:
+        Ref: LambdaSecurityGroup
+  AlbToSwarm:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId:
+        Ref: AlbSecurityGroup
+  SwarmInternalEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: '-1'
+      DestinationSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmManagerIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2377
+      ToPort: 2377
+      SourceSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmGossipTcpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: tcp
+      FromPort: 7946
+      ToPort: 7946
+      SourceSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmGossipUdpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: udp
+      FromPort: 7946
+      ToPort: 7946
+      SourceSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmOverlayIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: udp
+      FromPort: 4789
+      ToPort: 4789
+      SourceSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmEncryptedIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: SwarmSecurityGroup
+      IpProtocol: '50'
+      SourceSecurityGroupId:
+        Ref: SwarmSecurityGroup
+  SwarmManager:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: LinuxAmi
+      InstanceType:
+        Ref: InstanceType
+      IamInstanceProfile:
+        Ref: InstanceProfileName
+      NetworkInterfaces:
+      - DeviceIndex: '0'
+        AssociatePublicIpAddress: true
+        DeleteOnTermination: true
+        GroupSet:
+        - Ref: SwarmSecurityGroup
+        SubnetId:
+          Ref: SubnetA
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
+        HttpEndpoint: enabled
+      CreditSpecification:
+        CPUCredits: standard
+      BlockDeviceMappings:
+      - DeviceName: /dev/xvda
+        Ebs:
+          VolumeSize: 20
+          VolumeType: gp3
+          Encrypted: true
+          DeleteOnTermination: false
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            set -euo pipefail
+            export AWS_DEFAULT_REGION='${AWS::Region}'
+            dnf install -y docker
+            systemctl enable --now docker amazon-ssm-agent
+            mkdir -p /srv/foodgo/postgres /srv/foodgo/releases
+            FOODGO_IMDS_TOKEN=$(curl --fail --silent --show-error -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')
+            FOODGO_PRIVATE_IP=$(curl --fail --silent --show-error -H "X-aws-ec2-metadata-token: $FOODGO_IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+            if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != active ]; then
+              docker swarm init --advertise-addr "$FOODGO_PRIVATE_IP" >/dev/null
+            fi
+            test "$(docker info --format '{{.Swarm.ControlAvailable}}')" = true
+            docker node update --label-add foodgo.data=true "$(docker info --format '{{.Swarm.NodeID}}')" >/dev/null
+            FOODGO_WORKER_TOKEN=$(docker swarm join-token -q worker)
+            aws ssm put-parameter --name /foodgo/ep03/swarm-worker-token --type SecureString --value "$FOODGO_WORKER_TOKEN" --overwrite >/dev/null
+            unset FOODGO_WORKER_TOKEN FOODGO_IMDS_TOKEN
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-manager
+  SwarmWorker:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: LinuxAmi
+      InstanceType:
+        Ref: InstanceType
+      IamInstanceProfile:
+        Ref: InstanceProfileName
+      NetworkInterfaces:
+      - DeviceIndex: '0'
+        AssociatePublicIpAddress: true
+        DeleteOnTermination: true
+        GroupSet:
+        - Ref: SwarmSecurityGroup
+        SubnetId:
+          Ref: SubnetB
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
+        HttpEndpoint: enabled
+      CreditSpecification:
+        CPUCredits: standard
+      BlockDeviceMappings:
+      - DeviceName: /dev/xvda
+        Ebs:
+          VolumeSize: 20
+          VolumeType: gp3
+          Encrypted: true
+          DeleteOnTermination: true
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            set -euo pipefail
+            export AWS_DEFAULT_REGION='${AWS::Region}'
+            dnf install -y docker
+            systemctl enable --now docker amazon-ssm-agent
+            mkdir -p /srv/foodgo/postgres /srv/foodgo/releases
+            FOODGO_IMDS_TOKEN=$(curl --fail --silent --show-error -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')
+            FOODGO_PRIVATE_IP=$(curl --fail --silent --show-error -H "X-aws-ec2-metadata-token: $FOODGO_IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+            if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" = active ]; then
+              exit 0
+            fi
+            for FOODGO_ATTEMPT in $(seq 1 120); do
+              if FOODGO_WORKER_TOKEN=$(aws ssm get-parameter --name /foodgo/ep03/swarm-worker-token --with-decryption --query Parameter.Value --output text 2>/dev/null); then
+                if docker swarm join --token "$FOODGO_WORKER_TOKEN" --advertise-addr "$FOODGO_PRIVATE_IP" '${SwarmManager.PrivateIp}:2377' >/dev/null 2>&1; then
+                  unset FOODGO_WORKER_TOKEN FOODGO_IMDS_TOKEN
+                  exit 0
+                fi
+              fi
+              sleep 5
+            done
+            echo 'No fue posible incorporar el worker al cluster FoodGo' >&2
+            exit 1
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-worker
+  InternalAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: foodgo-ep03-interno
+      Scheme: internal
+      Type: application
+      Subnets:
+      - Ref: SubnetA
+      - Ref: SubnetB
+      SecurityGroups:
+      - Ref: AlbSecurityGroup
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-alb
+      LoadBalancerAttributes:
+      - Key: deletion_protection.enabled
+        Value: 'false'
+  IngressTargets:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: foodgo-ep03-ingress
+      VpcId:
+        Ref: VpcId
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Targets:
+      - Id:
+          Ref: SwarmManager
+      - Id:
+          Ref: SwarmWorker
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '30'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03-ingress
+  InternalListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Ref: InternalAlb
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: IngressTargets
+  VpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: foodgo-ep03-vpclink
+      SubnetIds:
+      - Ref: SubnetA
+      - Ref: SubnetB
+      SecurityGroupIds:
+      - Ref: GatewaySecurityGroup
+  FoodGoApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: foodgo-ep03
+      ProtocolType: HTTP
+  PrivateIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: FoodGoApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: ANY
+      IntegrationUri:
+        Ref: InternalListener
+      ConnectionType: VPC_LINK
+      ConnectionId:
+        Ref: VpcLink
+      PayloadFormatVersion: '1.0'
+      RequestParameters:
+        overwrite:path: $request.path
+      TimeoutInMillis: 30000
+  RootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: FoodGoApi
+      RouteKey: ANY /
+      AuthorizationType: AWS_IAM
+      Target:
+        Fn::Sub: integrations/${PrivateIntegration}
+  ProxyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: FoodGoApi
+      RouteKey: ANY /{proxy+}
+      AuthorizationType: AWS_IAM
+      Target:
+        Fn::Sub: integrations/${PrivateIntegration}
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: FoodGoApi
+      StageName: $default
+      AutoDeploy: true
+  AppDatabasePassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: foodgo-ep03/postgres-app
+      Description: FoodGo EP03, clave PostgreSQL generada; no guardar en Git
+      GenerateSecretString:
+        PasswordLength: 40
+        ExcludePunctuation: true
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03/postgres-app
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RootDatabasePassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: foodgo-ep03/postgres-admin
+      Description: FoodGo EP03, clave PostgreSQL generada; no guardar en Git
+      GenerateSecretString:
+        PasswordLength: 40
+        ExcludePunctuation: true
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-ep03/postgres-admin
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryUsuarios:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/usuarios
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/usuarios
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryRestaurantes:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/restaurantes
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/restaurantes
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryPedidos:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/pedidos
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/pedidos
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryPagos:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/pagos
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/pagos
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryDelivery:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/delivery
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/delivery
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryNotificaciones:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/notificaciones
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/notificaciones
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryCupones:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/cupones
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/cupones
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryResenas:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/resenas
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/resenas
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  RegistryEureka:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: foodgo/eureka
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Conservar
+          veinte imagenes para trazabilidad y rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo/eureka
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+Outputs:
+  ManagerInstanceId:
+    Value:
+      Ref: SwarmManager
+  WorkerInstanceId:
+    Value:
+      Ref: SwarmWorker
+  VpcId:
+    Value:
+      Ref: VpcId
+  SubnetIds:
+    Value:
+      Fn::Join:
+      - ','
+      - - Ref: SubnetA
+        - Ref: SubnetB
+  LambdaSecurityGroupId:
+    Value:
+      Ref: LambdaSecurityGroup
+  InternalAlbDns:
+    Value:
+      Fn::GetAtt:
+      - InternalAlb
+      - DNSName
+  SwarmSecurityGroupId:
+    Value:
+      Ref: SwarmSecurityGroup
+  InternalAlbArn:
+    Value:
+      Ref: InternalAlb
+  ApiEndpoint:
+    Value:
+      Fn::GetAtt:
+      - FoodGoApi
+      - ApiEndpoint
+  AppPasswordSecretArn:
+    Value:
+      Ref: AppDatabasePassword
+  RootPasswordSecretArn:
+    Value:
+      Ref: RootDatabasePassword
+  Registry:
+    Value:
+      Fn::Sub: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
