@@ -224,6 +224,7 @@ def deploy(args):
         script = f"""#!/bin/bash
 set -euo pipefail
 export AWS_DEFAULT_REGION={shlex.quote(s.region_name)}
+export AWS_REGION="$AWS_DEFAULT_REGION"
 exec 9>/var/lock/foodgo-ep03-deploy.lock
 flock -w 600 9
 aws ecr get-login-password | docker login --username AWS --password-stdin {shlex.quote(cluster['Registry'])}
@@ -254,6 +255,7 @@ docker service ps foodgo_{args.service}
         script = f"""#!/bin/bash
 set -euo pipefail
 export AWS_DEFAULT_REGION={shlex.quote(s.region_name)}
+export AWS_REGION="$AWS_DEFAULT_REGION"
 cloud-init status --wait
 exec 9>/var/lock/foodgo-ep03-deploy.lock
 flock -w 600 9

@@ -136,6 +136,7 @@ class DeploymentTests(TestCase):
         self.assertIn("tr -d '\\r\\n'", script)
         self.assertNotIn("tr -d '\\\\r\\\\n'", script)
         self.assertIn("docker stack deploy --with-registry-auth", script)
+        self.assertIn('export AWS_REGION="$AWS_DEFAULT_REGION"', script)
         self.assertNotIn("docker volume rm", script)
         self.assertNotIn("docker system prune", script)
         self.assertNotIn("swarm leave", script)
