@@ -4,3 +4,11 @@ target/
 .vscode/
 *.iml
 .DS_Store
+.runtime/
+.env
+.env.*
+!.env.example
+*.pem
+*.ppk
+__pycache__/
+evidencias/*.json

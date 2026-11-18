@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: FoodGo EP03 - SQS y Lambda Java 21 con el rol existente LabRole.
+Parameters:
+  ArtifactBucket:
+    Type: String
+    Description: Bucket privado propio que contiene el JAR de Lambda.
+  ArtifactKey:
+    Type: String
+    Description: Clave del JAR versionada por commit.
+  BackendUrl:
+    Type: String
+    AllowedPattern: https?://[^ ]+
+    Description: ALB interno seguido de /notificaciones.
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+Resources:
+  FailedNotifications:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: foodgo-notificaciones-errores-ep03
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-notificaciones-errores-ep03
+  Notifications:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: foodgo-notificaciones-ep03
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - FailedNotifications
+          - Arn
+        maxReceiveCount: 3
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-notificaciones-ep03
+  FunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/foodgo-notificaciones-ep03
+      RetentionInDays: 7
+  NotificationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: foodgo-notificaciones-ep03
+      Runtime: java21
+      Architectures:
+      - x86_64
+      Handler: cl.duoc.jv0101.foodgo.lambda.NotificacionHandler::handleRequest
+      Role:
+        Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole
+      Code:
+        S3Bucket:
+          Ref: ArtifactBucket
+        S3Key:
+          Ref: ArtifactKey
+      MemorySize: 512
+      Timeout: 15
+      ReservedConcurrentExecutions: 2
+      VpcConfig:
+        SubnetIds:
+          Ref: SubnetIds
+        SecurityGroupIds:
+        - Ref: LambdaSecurityGroupId
+      Environment:
+        Variables:
+          NOTIFICACIONES_BASE_URL:
+            Ref: BackendUrl
+          JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8
+            -Duser.timezone=UTC
+      Tags:
+      - Key: Project
+        Value: FoodGo
+      - Key: Evaluation
+        Value: EP03
+      - Key: Name
+        Value: foodgo-notificaciones-ep03
+    DependsOn:
+    - FunctionLogs
+  SqsConsumer:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn:
+        Fn::GetAtt:
+        - Notifications
+        - Arn
+      FunctionName:
+        Ref: NotificationFunction
+      Enabled: true
+      BatchSize: 1
+      FunctionResponseTypes:
+      - ReportBatchItemFailures
+      ScalingConfig:
+        MaximumConcurrency: 2
+Outputs:
+  QueueUrl:
+    Value:
+      Ref: Notifications
+  QueueArn:
+    Value:
+      Fn::GetAtt:
+      - Notifications
+      - Arn
+  FailedQueueUrl:
+    Value:
+      Ref: FailedNotifications
+  FunctionName:
+    Value:
+      Ref: NotificationFunction
