@@ -11,7 +11,7 @@ import tarfile
 import time
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, WaiterError
 
 ROOT = Path(__file__).resolve().parents[1]
 CLUSTER = "foodgo-ep03-cluster"
@@ -50,6 +50,19 @@ def outputs(client, name):
     return {v["OutputKey"]: v["OutputValue"] for v in current.get("Outputs", [])}
 
 
+def internal_alb_name(client, existing):
+    if not existing:
+        return "foodgo-ep03-interno"
+    detail = client.describe_stack_resource(StackName=CLUSTER, LogicalResourceId="InternalAlb")["StackResourceDetail"]
+    arn = detail["PhysicalResourceId"]
+    match = re.fullmatch(r"arn:aws:elasticloadbalancing:[a-z0-9-]+:\d{12}:loadbalancer/app/(foodgo-ep03-interno(?:-[a-zA-Z0-9]+)?)/[a-zA-Z0-9]+", arn)
+    if not match or len(match[1]) > 32:
+        raise ValueError("No se identifico el ALB FoodGo vigente; no se reemplazara automaticamente")
+    # Una recuperacion puede cambiar su nombre fisico. Volver al nombre original
+    # reemplazaria el ALB y asociaria su target group a dos balanceadores.
+    return match[1]
+
+
 def deploy_template(client, name, filename, parameters):
     body = filename.read_text(encoding="utf-8")
     client.validate_template(TemplateBody=body)
@@ -77,7 +90,17 @@ def deploy_template(client, name, filename, parameters):
         client.create_stack(**options, OnFailure="ROLLBACK")
         waiter = "stack_create_complete"
     print(name + ": esperando CloudFormation", flush=True)
-    client.get_waiter(waiter).wait(StackName=name, WaiterConfig={"Delay": 15, "MaxAttempts": 80})
+    try:
+        client.get_waiter(waiter).wait(StackName=name, WaiterConfig={"Delay": 15, "MaxAttempts": 80})
+    except WaiterError:
+        try:
+            events = client.describe_stack_events(StackName=name)["StackEvents"]
+            failures = [e for e in events if e.get("ResourceStatus") in ("CREATE_FAILED", "UPDATE_FAILED", "DELETE_FAILED")]
+            for event in failures[:6]:
+                print(f"{name}: {event['LogicalResourceId']} {event['ResourceStatus']}: {event.get('ResourceStatusReason', 'sin detalle')}", flush=True)
+        except ClientError:
+            print(name + ": no se pudieron consultar los eventos; revisar Events en CloudFormation", flush=True)
+        raise
     print(name + ": completado", flush=True)
     return outputs(client, name)
 
@@ -139,6 +162,7 @@ def provision(args):
         ami = s.client("ssm").get_parameter(Name="/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64")["Parameter"]["Value"]
     if not re.fullmatch(r"ami-[a-f0-9]+", ami):
         raise ValueError("AMI invalida; no se reemplazaran instancias automaticamente")
+    alb_name = internal_alb_name(cfn, existing)
     s.client("iam").get_instance_profile(InstanceProfileName="LabInstanceProfile")
     s.client("iam").get_role(RoleName="LabRole")
     sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -165,7 +189,7 @@ def provision(args):
         s.client("s3").upload_file(str(path), bucket, prefix + "/" + key, ExtraArgs={"ServerSideEncryption": "AES256"})
     cluster = deploy_template(cfn, CLUSTER, ROOT / "infra/aws/cluster.yaml", {
         "VpcId": vpc, "SubnetA": subnet_a, "SubnetB": subnet_b, "LinuxAmi": ami,
-        "InstanceType": "t3.medium", "InstanceProfileName": "LabInstanceProfile"})
+        "InstanceType": "t3.medium", "InstanceProfileName": "LabInstanceProfile", "InternalAlbName": alb_name})
     messaging = deploy_template(cfn, MESSAGING, ROOT / "infra/aws/mensajeria.yaml", {
         "ArtifactBucket": bucket, "ArtifactKey": prefix + "/function.jar",
         "BackendUrl": "http://" + cluster["InternalAlbDns"] + "/notificaciones",

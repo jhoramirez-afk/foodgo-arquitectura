@@ -13,7 +13,7 @@ import cloud
 import smoke
 import source_matrix
 from botocore.credentials import Credentials
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, WaiterError
 
 
 ACCOUNT = "123456789012"
@@ -45,6 +45,49 @@ class AccountTests(TestCase):
 
 
 class StackTests(TestCase):
+    def test_new_cluster_uses_default_alb_name_without_existing_resources(self):
+        client = MagicMock()
+        self.assertEqual("foodgo-ep03-interno", cloud.internal_alb_name(client, None))
+        client.describe_stack_resource.assert_not_called()
+
+    def test_recovered_alb_keeps_its_physical_name_during_provision(self):
+        client = MagicMock()
+        recovered = "foodgo-ep03-interno-r11221606"
+        client.describe_stack_resource.return_value = {"StackResourceDetail": {
+            "PhysicalResourceId": f"arn:aws:elasticloadbalancing:us-east-1:{ACCOUNT}:loadbalancer/app/{recovered}/0123456789abcdef"}}
+        self.assertEqual(recovered, cloud.internal_alb_name(client, {"StackStatus": "UPDATE_ROLLBACK_COMPLETE"}))
+        with patch.object(cloud, "stack", return_value={"StackStatus": "UPDATE_ROLLBACK_COMPLETE"}), patch.object(cloud, "outputs", return_value={}), TemporaryDirectory() as folder:
+            path = Path(folder) / "template.yaml"
+            path.write_text("Resources: {}", encoding="utf-8")
+            cloud.deploy_template(client, cloud.CLUSTER, path, {"InternalAlbName": recovered})
+        self.assertIn({"ParameterKey": "InternalAlbName", "ParameterValue": recovered}, client.update_stack.call_args.kwargs["Parameters"])
+        client.create_stack.assert_not_called()
+        client.delete_stack.assert_not_called()
+
+    def test_unrecognized_alb_never_falls_back_to_a_replacement_name(self):
+        client = MagicMock()
+        for arn in ["", "otro", f"arn:aws:elasticloadbalancing:us-east-1:{ACCOUNT}:loadbalancer/app/otra-aplicacion/0123456789abcdef"]:
+            with self.subTest(arn=arn):
+                client.describe_stack_resource.return_value = {"StackResourceDetail": {"PhysicalResourceId": arn}}
+                with self.assertRaisesRegex(ValueError, "ALB FoodGo vigente"):
+                    cloud.internal_alb_name(client, {"StackStatus": "UPDATE_COMPLETE"})
+        client.update_stack.assert_not_called()
+
+    def test_failed_update_prints_resource_reason_and_preserves_waiter_error(self):
+        client = MagicMock()
+        failure = WaiterError(name="StackUpdateComplete", reason="UPDATE_ROLLBACK_COMPLETE", last_response={})
+        client.get_waiter.return_value.wait.side_effect = failure
+        client.describe_stack_events.return_value = {"StackEvents": [{
+            "LogicalResourceId": "InternalListener", "ResourceStatus": "CREATE_FAILED",
+            "ResourceStatusReason": "Target group cannot be associated with more than one load balancer"}]}
+        with patch.object(cloud, "stack", return_value={"StackStatus": "UPDATE_COMPLETE"}), TemporaryDirectory() as folder, patch("builtins.print") as output:
+            path = Path(folder) / "template.yaml"
+            path.write_text("Resources: {}", encoding="utf-8")
+            with self.assertRaises(WaiterError) as raised:
+                cloud.deploy_template(client, cloud.CLUSTER, path, {})
+        self.assertIs(failure, raised.exception)
+        self.assertTrue(any("InternalListener CREATE_FAILED: Target group" in str(c.args) for c in output.call_args_list))
+
     def test_access_denied_is_not_treated_as_missing_stack(self):
         client = MagicMock()
         client.describe_stacks.side_effect = error("AccessDenied")
