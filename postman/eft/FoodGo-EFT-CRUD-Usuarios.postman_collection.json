@@ -1,0 +1,601 @@
+{
+  "info": {
+    "name": "FoodGo | EFT | CRUD Usuarios y direcciones",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Demostración EFT: CRUD real, relación JPA, errores y comprobación después del reinicio. No borra datos previos. Los DELETE usan exclusivamente los IDs capturados al crear. Ver guion para detenerse en SQL antes de eliminar. Validación HTTP de esta nueva colección pendiente."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "protocolProfileBehavior": {
+    "followRedirects": false
+  },
+  "variable": [
+    {
+      "key": "usuarios_base_url",
+      "value": "http://127.0.0.1:18081"
+    },
+    {
+      "key": "correo_cliente",
+      "value": "valentina.rojas@example.com"
+    },
+    {
+      "key": "usuario_id",
+      "value": ""
+    },
+    {
+      "key": "direccion_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Crear, consultar y actualizar",
+      "item": [
+        {
+          "name": "01 Crear cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/usuarios",
+            "description": "Crea únicamente el cliente del ejercicio. Si el correo ya existe, no reutilizar IDs ajenos: resolver el ensayo anterior o escoger otro correo propio de demostración.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Valentina Rojas\",\n  \"rol\": \"CLIENTE\",\n  \"email\": \"{{correo_cliente}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"usuario_id\");",
+                  "pm.collectionVariables.unset(\"direccion_id\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const x=pm.response.json(); pm.collectionVariables.set(\"usuario_id\",String(x.id)); pm.test(\"Cliente creado con ID\",()=>pm.expect(x.id).to.be.a(\"number\")); } else { pm.execution.setNextRequest(null); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Listar clientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"La lista incluye al cliente creado\",()=>pm.expect(pm.response.json().some(x=>String(x.id)===pm.collectionVariables.get(\"usuario_id\"))).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Consultar cliente por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"ID solicitado\",()=>pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get(\"usuario_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Crear dirección del cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}/direcciones",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Casa\",\n  \"calle\": \"Los Canelos 820\",\n  \"comuna\": \"Ñuñoa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "if(pm.response.code===201){pm.collectionVariables.set(\"direccion_id\",String(pm.response.json().id));}else{pm.execution.setNextRequest(null);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Consultar relación usuario-dirección",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"La dirección pertenece al usuario\",()=>pm.expect(pm.response.json().direcciones.some(x=>String(x.id)===pm.collectionVariables.get(\"direccion_id\"))).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Actualizar cliente por ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Valentina Rojas Pérez\",\n  \"rol\": \"CLIENTE\",\n  \"email\": \"{{correo_cliente}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre actualizado\",()=>pm.expect(pm.response.json().nombre).to.eql(\"Valentina Rojas Pérez\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Actualizar dirección por su ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/direcciones/{{direccion_id}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Departamento\",\n  \"calle\": \"Los Canelos 820, departamento 504\",\n  \"comuna\": \"Ñuñoa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Dirección actualizada\",()=>pm.expect(pm.response.json().alias).to.eql(\"Departamento\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Verificar ambos cambios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const x=pm.response.json();",
+                  "pm.test(\"Nombre y dirección persistidos\",()=>{pm.expect(x.nombre).to.eql(\"Valentina Rojas Pérez\");const d=x.direcciones.find(v=>String(v.id)===pm.collectionVariables.get(\"direccion_id\"));pm.expect(d).to.be.an(\"object\");pm.expect(d.alias).to.eql(\"Departamento\");pm.expect(d.comuna).to.eql(\"Ñuñoa\");});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Persistencia: repetir tras reiniciar",
+      "item": [
+        {
+          "name": "09 Consultar después del reinicio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": "Repetir manualmente después de docker compose restart app y de recuperar estado healthy; esta petición no reinicia nada."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const x=pm.response.json();",
+                  "pm.test(\"Nombre y dirección persistidos\",()=>{pm.expect(x.nombre).to.eql(\"Valentina Rojas Pérez\");const d=x.direcciones.find(v=>String(v.id)===pm.collectionVariables.get(\"direccion_id\"));pm.expect(d).to.be.an(\"object\");pm.expect(d.alias).to.eql(\"Departamento\");pm.expect(d.comuna).to.eql(\"Ñuñoa\");});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Manejo de errores",
+      "item": [
+        {
+          "name": "10 Correo duplicado: conflicto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/usuarios",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Valentina Rojas\",\n  \"rol\": \"CLIENTE\",\n  \"email\": \"{{correo_cliente}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Solicitud incompleta: validación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{usuarios_base_url}}/api/usuarios",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Valentina Rojas\",\n  \"rol\": \"CLIENTE\",\n  \"email\": \"correo-invalido\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Recurso inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/9223372036854775807",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Eliminar solo lo creado",
+      "item": [
+        {
+          "name": "13 Eliminar dirección creada",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/direcciones/{{direccion_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Confirmar dirección eliminada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/direcciones/{{direccion_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }",
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"direccion_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea la dirección con 04.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Eliminar cliente creado",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 Confirmar cliente eliminado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{usuarios_base_url}}/api/usuarios/{{usuario_id}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d+$/.test(String(pm.collectionVariables.get(\"usuario_id\") || \"\"))) { pm.execution.skipRequest(); throw new Error(\"Primero crea el usuario con 01 y verifica HTTP 201; no escribas un ID ajeno.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

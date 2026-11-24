@@ -3,6 +3,18 @@ name: Desplegar FoodGo en AWS Academy
 on:
   push:
     branches: [main]
+    # El material de presentación y las validaciones de CI no deben iniciar AWS.
+    # Los cambios del propio workflow pueden probarse mediante workflow_dispatch.
+    paths:
+      - 'infra/**'
+      - 'swarm/**'
+      - 'functions/**'
+      - 'scripts/cloud.py'
+      - 'scripts/registry.py'
+      - 'scripts/smoke.py'
+      - 'scripts/source_matrix.py'
+      - 'scripts/requirements-aws.txt'
+      - 'docker-stack.yml'
   workflow_dispatch:
 
 permissions:

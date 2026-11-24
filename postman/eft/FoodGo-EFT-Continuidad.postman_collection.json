@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "FoodGo | EFT AWS | Continuidad durante escalado",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Solo GET de Notificaciones. Runner funcional secuencial: 10000 iteraciones, Delay 100 ms, detener al finalizar subida y bajada. No equivale a cuatro usuarios concurrentes. No crea datos. No es una prueba de capacidad máxima."
+  },
+  "auth": {
+    "type": "awsv4",
+    "awsv4": [
+      {
+        "key": "accessKey",
+        "value": "{{aws_access_key_id}}",
+        "type": "string"
+      },
+      {
+        "key": "secretKey",
+        "value": "{{aws_secret_access_key}}",
+        "type": "string"
+      },
+      {
+        "key": "sessionToken",
+        "value": "{{aws_session_token}}",
+        "type": "string"
+      },
+      {
+        "key": "region",
+        "value": "{{aws_region}}",
+        "type": "string"
+      },
+      {
+        "key": "service",
+        "value": "execute-api",
+        "type": "string"
+      }
+    ]
+  },
+  "protocolProfileBehavior": {
+    "followRedirects": false
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const base = pm.variables.replaceIn(\"{{api_base_url}}\");",
+          "const match = /^https:\\/\\/[a-z0-9]+\\.execute-api\\.(us-east-1|us-west-2)\\.amazonaws\\.com\\/?$/.exec(base);",
+          "if (!match || match[1] !== pm.variables.get(\"aws_region\")) {",
+          "  console.error(\"Configurar api_base_url con el API Gateway HTTPS de la región del laboratorio.\");",
+          "  pm.execution.skipRequest();",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_base_url",
+      "value": ""
+    },
+    {
+      "key": "aws_region",
+      "value": "us-east-1"
+    },
+    {
+      "key": "notificacion_id",
+      "value": ""
+    },
+    {
+      "key": "evento_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Consultar Notificaciones durante el escalado",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{api_base_url}}/notificaciones/api/notificaciones"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+              "pm.test(\"Listado JSON\",()=>pm.expect(pm.response.json()).to.be.an(\"array\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
