@@ -14,6 +14,7 @@ import smoke
 import source_matrix
 from botocore.credentials import Credentials
 from botocore.exceptions import ClientError, WaiterError
+from botocore.stub import Stubber
 
 
 ACCOUNT = "123456789012"
@@ -154,6 +155,51 @@ class SigningTests(TestCase):
             unsigned = build.return_value.open.call_args.args[0]
             self.assertIsNone(unsigned.get_header("Authorization"))
             self.assertIsNone(unsigned.get_header("X-amz-security-token"))
+
+
+class CloudWatchTests(TestCase):
+    def test_empty_first_page_still_finds_processed_messages_on_next_page(self):
+        client = cloud.boto3.client("logs", region_name="us-east-1", aws_access_key_id="prueba", aws_secret_access_key="prueba")
+        request = {"logGroupName": "/aws/lambda/foodgo-notificaciones-ep03", "startTime": 1000,
+                   "filterPattern": '"evento-actual"', "limit": 100}
+        with Stubber(client) as stub:
+            stub.add_response("filter_log_events", {"events": [], "nextToken": "pagina-siguiente"}, request)
+            stub.add_response("filter_log_events", {"events": [
+                {"timestamp": 1001, "message": "Procesado mensaje=reentrega-1 evento=evento-actual notificacion=1\n"},
+                {"timestamp": 1002, "message": "Procesado mensaje=reentrega-2 evento=evento-actual notificacion=1\n"}]},
+                {**request, "nextToken": "pagina-siguiente"})
+            self.assertEqual({"reentrega-1", "reentrega-2"}, smoke.processed_messages(client, request["logGroupName"], "evento-actual", 1000))
+            stub.assert_no_pending_responses()
+
+    def test_other_event_or_retry_log_does_not_count_as_processed(self):
+        client = MagicMock()
+        client.get_paginator.return_value.paginate.return_value = [{"events": [
+            {"message": "Reintentar mensaje=fallido causa=IOException"},
+            {"message": "Procesado mensaje=otro evento=evento-actual-extra notificacion=1"},
+            {"message": "Procesado mensaje=correcto evento=evento-actual notificacion=1"}]}]
+        self.assertEqual({"correcto"}, smoke.processed_messages(client, "grupo", "evento-actual", 1000))
+
+    def flow(self, processed):
+        session, api = MagicMock(), MagicMock()
+        event_id = "evento-actual"
+        attempt = {"eventoId": event_id, "resultado": "ENVIADO", "detalle": "Simulación académica: aviso registrado"}
+        api.call.side_effect = [
+            (200, [{"id": 1, "destinatario": "camila.soto@example.com", "mensaje": "Camila, tu pedido de La Cocina de Barrio esta en camino."}]),
+            (202, {"estado": "ENCOLADO", "eventoId": event_id, "mensajeId": "original"}),
+            (200, [attempt]), (200, [attempt])]
+        session.client.return_value.send_message_batch.return_value = {"Successful": [
+            {"Id": "reentrega-1", "MessageId": "mensaje-1"}, {"Id": "reentrega-2", "MessageId": "mensaje-2"}]}
+        with patch.object(smoke, "processed_messages", return_value=processed), patch.object(smoke.time, "sleep"), patch("builtins.print"):
+            return smoke.async_flow(session, api, {"QueueUrl": "cola", "FunctionName": "funcion"})
+
+    def test_missing_replay_logs_still_fail_the_verification(self):
+        with self.assertRaisesRegex(RuntimeError, "No se verificaron las dos reentregas"):
+            self.flow({"mensaje-1"})
+
+    def test_two_processed_replays_still_require_one_persisted_attempt(self):
+        result = self.flow({"mensaje-1", "mensaje-2"})
+        self.assertEqual(2, result["reentregasProcesadas"])
+        self.assertEqual(1, result["intentosPersistidos"])
 
 
 class DeploymentTests(TestCase):

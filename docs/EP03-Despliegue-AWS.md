@@ -46,6 +46,8 @@ El pipeline:
 
 Un archivo con `estado: EN_CURSO` indica que la prueba no terminó correctamente. Sin evidencia no se declara validado. Revisar el primer error antes de repetir. Un fallo de build posterior a la provisión puede dejar recursos activos generando costos.
 
+El comprobador de reentregas busca el `eventoId` actual en todas las páginas de CloudWatch desde el inicio de la prueba, con un minuto de margen. Una página vacía puede tener páginas siguientes. Sólo confirma el flujo cuando encuentra los dos mensajes de reentrega procesados y comprueba un único intento persistido para ese evento.
+
 ## Comandos directos
 
 Estos comandos van en **AWS CloudShell** (Bash):
