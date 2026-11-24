@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import math
+import re
 import subprocess
 import time
 import urllib.error
@@ -67,7 +68,24 @@ def wait_ready(api, domain, resource):
     raise RuntimeError("No responde el dominio " + domain)
 
 
+def processed_messages(logs, group, event_id, start_ms):
+    # CloudWatch puede devolver una pagina vacia con nextToken. Recorrer todas
+    # las paginas y acotar a esta prueba evita confundirla con ausencia de logs.
+    found = set()
+    pattern = re.compile(r"Procesado mensaje=(\S+) evento=" + re.escape(event_id) + r"(?=\s|$)")
+    pages = logs.get_paginator("filter_log_events").paginate(
+        logGroupName=group, startTime=start_ms, filterPattern='"' + event_id + '"',
+        PaginationConfig={"PageSize": 100})
+    for page in pages:
+        for entry in page.get("events", []):
+            match = pattern.search(entry.get("message", ""))
+            if match:
+                found.add(match[1])
+    return found
+
+
 def async_flow(s, api, messaging):
+    start_ms = int(time.time() * 1000) - 60000
     message = "Camila, tu pedido de La Cocina de Barrio esta en camino."
     code, notices = api.call("/notificaciones/api/notificaciones")
     if code != 200:
@@ -104,13 +122,11 @@ def async_flow(s, api, messaging):
     pending = {v["MessageId"] for v in replay["Successful"]}
     logs = s.client("logs")
     for attempt in range(90):
-        for message_id in list(pending):
-            entries = logs.filter_log_events(logGroupName="/aws/lambda/" + messaging["FunctionName"],
-                filterPattern='"Procesado mensaje=' + message_id + '"', limit=20).get("events", [])
-            if any(event_id in v["message"] for v in entries):
-                pending.remove(message_id)
+        pending.difference_update(processed_messages(logs, "/aws/lambda/" + messaging["FunctionName"], event_id, start_ms))
         if not pending:
             break
+        if attempt % 15 == 0:
+            print(f"CloudWatch: esperando {len(pending)} reentregas del evento actual", flush=True)
         time.sleep(2)
     if pending:
         raise RuntimeError("No se verificaron las dos reentregas en los logs reales de Lambda")
