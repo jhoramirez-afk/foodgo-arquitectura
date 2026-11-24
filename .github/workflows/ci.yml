@@ -1,4 +1,4 @@
-name: Validar FoodGo EP03
+name: Validar FoodGo
 
 on:
   push:
@@ -36,6 +36,8 @@ jobs:
           python -m compileall -q scripts
           python -m unittest discover -s scripts/tests -v
           bash -n swarm/init-postgres.sh
+      - name: Validar contratos y espera de las colecciones EFT sin AWS
+        run: node postman/tests/validate-eft.cjs
       - name: Validar la definicion Swarm
         run: docker stack config --skip-interpolation -c docker-stack.yml > /dev/null
       - name: Conservar pruebas y JAR
@@ -44,6 +46,7 @@ jobs:
         with:
           name: foodgo-lambda-validacion
           path: |
+            evidencias/postman-eft-estatica.json
             functions/notificaciones/target/surefire-reports/
             functions/notificaciones/target/foodgo-notificaciones-lambda-3.0.0.jar
           retention-days: 30

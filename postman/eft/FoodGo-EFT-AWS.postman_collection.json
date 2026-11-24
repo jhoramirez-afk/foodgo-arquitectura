@@ -1,0 +1,444 @@
+{
+  "info": {
+    "name": "FoodGo | EFT AWS | Acceso y SQS-Lambda",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Configurar api_base_url con el ApiEndpoint del stack. Usar AWS Signature en la colección, servicio execute-api, región del laboratorio y tres credenciales temporales locales o de Vault. El archivo no contiene claves. Mantener desactivado el seguimiento de redirecciones para no reenviar datos de autorización a otro destino. En Runner: una iteración y Delay 1000 ms. GET 05 reintenta hasta 30 consultas si el evento aún no existe, exige exactamente un ENVIADO y falla al agotar el límite. En Send manual el encadenamiento no se ejecuta: esperar y repetir GET. Validación HTTP de esta copia pendiente."
+  },
+  "auth": {
+    "type": "awsv4",
+    "awsv4": [
+      {
+        "key": "accessKey",
+        "value": "{{aws_access_key_id}}",
+        "type": "string"
+      },
+      {
+        "key": "secretKey",
+        "value": "{{aws_secret_access_key}}",
+        "type": "string"
+      },
+      {
+        "key": "sessionToken",
+        "value": "{{aws_session_token}}",
+        "type": "string"
+      },
+      {
+        "key": "region",
+        "value": "{{aws_region}}",
+        "type": "string"
+      },
+      {
+        "key": "service",
+        "value": "execute-api",
+        "type": "string"
+      }
+    ]
+  },
+  "protocolProfileBehavior": {
+    "followRedirects": false
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const base = pm.variables.replaceIn(\"{{api_base_url}}\");",
+          "const match = /^https:\\/\\/[a-z0-9]+\\.execute-api\\.(us-east-1|us-west-2)\\.amazonaws\\.com\\/?$/.exec(base);",
+          "if (!match || match[1] !== pm.variables.get(\"aws_region\")) {",
+          "  console.error(\"Configurar api_base_url con el API Gateway HTTPS de la región del laboratorio.\");",
+          "  pm.execution.skipRequest();",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_base_url",
+      "value": ""
+    },
+    {
+      "key": "aws_region",
+      "value": "us-east-1"
+    },
+    {
+      "key": "notificacion_id",
+      "value": ""
+    },
+    {
+      "key": "evento_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Sin firma IAM: acceso rechazado",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{api_base_url}}/usuarios/api/usuarios",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Ocho dominios por API Gateway",
+      "item": [
+        {
+          "name": "Usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/usuarios/api/usuarios"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restaurantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/restaurantes/api/restaurantes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/pedidos/api/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pagos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/pagos/api/pagos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delivery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/delivery/api/envios"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cupones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/cupones/api/cupones"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resenas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/resenas/api/resenas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Respuesta es una lista\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Notificaciones: productor, cola y consumidor",
+      "description": "Ejecutar 03 y 04 una vez. Enviar 05 después de que Lambda procese el evento. No es un Runner automático con espera. El 202 no prueba que el consumidor haya terminado.",
+      "item": [
+        {
+          "name": "03 Crear aviso del pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destinatario\": \"valentina.rojas@example.com\",\n  \"canal\": \"EMAIL\",\n  \"mensaje\": \"Valentina, tu pedido de La Cocina de Barrio está en camino.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"notificacion_id\");",
+                  "pm.collectionVariables.unset(\"evento_id\");",
+                  "pm.collectionVariables.unset(\"consultas_evento\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set(\"notificacion_id\", pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Publicar evento en SQS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones/{{notificacion_id}}/encolar"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"evento_id\");",
+                  "pm.collectionVariables.set(\"consultas_evento\",0);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 202\", () => pm.response.to.have.status(202));",
+                  "if (pm.response.code === 202) { const r=pm.response.json();",
+                  "  pm.test(\"SQS aceptó el evento\", () => { pm.expect(r.estado).to.eql(\"ENCOLADO\"); pm.expect(r.mensajeId).to.be.a(\"string\").and.not.empty; });",
+                  "  pm.collectionVariables.set(\"evento_id\", r.eventoId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Esperar resultado persistido del evento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones/{{notificacion_id}}/intentos"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"evento_id\") || !pm.collectionVariables.get(\"notificacion_id\")) { pm.execution.skipRequest(); throw new Error(\"Ejecutar 03 y 04 correctamente antes de consultar el resultado.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); } else {",
+                  "  const data=pm.response.json();",
+                  "  pm.test(\"Respuesta de intentos es una lista\",()=>pm.expect(data).to.be.an(\"array\"));",
+                  "  if (!Array.isArray(data)) { pm.execution.setNextRequest(null); } else {",
+                  "    const rows=data.filter(r=>r.eventoId===pm.collectionVariables.get(\"evento_id\"));",
+                  "    const count=Number(pm.collectionVariables.get(\"consultas_evento\")||0)+1;",
+                  "    pm.collectionVariables.set(\"consultas_evento\",count);",
+                  "    if(rows.length===0 && count<30){",
+                  "      console.log(\"Procesamiento pendiente; consulta \"+count+\"/30. No es una confirmación de éxito.\");",
+                  "      pm.execution.setNextRequest(pm.info.requestId);",
+                  "    } else {",
+                  "      pm.test(\"Un intento del mismo evento antes del límite\",()=>pm.expect(rows).to.have.lengthOf(1));",
+                  "      if(rows.length===1){pm.test(\"Evento procesado como simulación académica\",()=>{pm.expect(rows[0].resultado).to.eql(\"ENVIADO\");pm.expect(rows[0].detalle).to.include(\"Simulación académica\");});}",
+                  "      if(rows.length!==1 || rows[0].resultado!==\"ENVIADO\"){pm.execution.setNextRequest(null);}",
+                  "      pm.collectionVariables.unset(\"consultas_evento\");",
+                  "    }",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 ID inexistente: error del dominio",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones/9223372036854775807/encolar"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Datos incompletos: validación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": "{{api_base_url}}/notificaciones/api/notificaciones",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canal\": \"EMAIL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
