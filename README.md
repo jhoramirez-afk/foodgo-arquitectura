@@ -48,6 +48,9 @@ flowchart LR
 
 ## Ejecución y evidencia
 
+La demostración EP03 verifica Docker local, CI/CD, Swarm
+y el flujo SQS/Lambda.
+
 1. [Despliegue AWS Academy](docs/EP03-Despliegue-AWS.md): requisitos, revisión, variables y comandos.
 2. [Pruebas y presentación](docs/EP03-Pruebas-y-presentacion.md): matriz de indicadores y demostración.
 3. [Operación Swarm](swarm/README.md): comandos en el manager.
