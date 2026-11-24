@@ -25,6 +25,12 @@ Parameters:
   LinuxAmi:
     Type: AWS::EC2::Image::Id
     Description: AMI fijada al crear el cluster; conservar su valor en actualizaciones.
+  InternalAlbName:
+    Type: String
+    Default: foodgo-ep03-interno
+    AllowedPattern: 'foodgo-ep03-interno(-[a-zA-Z0-9]+)?'
+    MaxLength: 32
+    Description: Nombre del ALB vigente; la provision lo conserva al actualizar.
 Resources:
   SwarmSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -312,7 +318,8 @@ Resources:
   InternalAlb:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: foodgo-ep03-interno
+      Name:
+        Ref: InternalAlbName
       Scheme: internal
       Type: application
       Subnets:

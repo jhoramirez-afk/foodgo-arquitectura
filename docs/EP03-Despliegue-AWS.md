@@ -84,6 +84,10 @@ PostgreSQL está fijado al nodo `foodgo.data=true`, en `/srv/foodgo/postgres`. N
 
 El AMI se fija al crear el cluster y se conserva después. Actualizar imágenes de aplicación no reemplaza el nodo de datos. Las actualizaciones fallidas de tareas tienen rollback configurado; revisar tareas y logs antes de forzarlo.
 
+El parámetro `InternalAlbName` conserva el nombre físico del balanceador que ya administra CloudFormation, incluso si una recuperación lo cambió. El pipeline obtiene ese nombre del recurso `InternalAlb`; no vuelve al nombre inicial al actualizar. Así evita reemplazar el ALB y asociar su grupo de destinos a dos balanceadores durante la transición.
+
+Si la provisión termina en rollback, el log muestra el recurso fallido y su `ResourceStatusReason`. Revisar ese motivo antes de reintentar. `UPDATE_ROLLBACK_COMPLETE` permite preparar una actualización corregida; no es necesario borrar el stack ni las bases.
+
 ## Presupuesto y cierre
 
 Deshabilitar `AWS_DEPLOY_ENABLED` y retirar los secretos temporales cuando no se usarán. `End Lab` no garantiza que ALB, ECR, S3 y discos dejen de consumir presupuesto. Detener EC2 tampoco elimina esos cargos. Revisar recursos y presupuesto, considerando el retraso del panel de Academy.
