@@ -1,6 +1,17 @@
-Antes de entregar:
-1. Abran FoodGo_Arquitectura.drawio en https://app.diagrams.net (Open Existing Diagram).
-2. Ajusten lo que necesiten (iconos AWS, colores, distribución).
-3. Exporten como PNG (File > Export as > PNG) y guárdenlo en esta misma carpeta como
-   FoodGo_Arquitectura.png.
-4. Ese PNG es el que se copia directamente en AVA junto con los enlaces de GitHub.
+FOODGO / DIAGRAMA DE LA ENTREGA FINAL
+
+FoodGo_Arquitectura.drawio: fuente editable del sistema implementado.
+FoodGo_Arquitectura.png: imagen final para AVA y la presentación.
+
+El directorio EP01 conserva sin alterar la propuesta inicial (Draw.io y JPG).
+Esa propuesta contiene componentes que no se implementaron y no describe el despliegue actual.
+
+Arquitectura actual:
+Postman con firma SigV4 -> API Gateway AWS_IAM -> VPC Link -> ALB interno
+-> Nginx -> ocho servicios Spring Boot en Docker Swarm.
+PostgreSQL conserva ocho bases de dominio; Eureka registra las instancias.
+Notificaciones -> SQS -> Lambda Java 21 -> backend privado -> intento persistido.
+GitHub Actions, CloudFormation, ECR y S3 coordinan la entrega.
+
+Un manager y un worker no dan alta disponibilidad del plano de control.
+PostgreSQL no está replicado. Pagos y avisos son registros académicos.

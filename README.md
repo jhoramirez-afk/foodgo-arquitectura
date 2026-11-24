@@ -1,4 +1,4 @@
-# FoodGo — despliegue EP03
+# FoodGo — entrega final
 
 JVY0101 · Jhohan Ramírez y Alex Llanten. Implementación académica de ocho dominios de delivery en Spring Boot, Java 21 y PostgreSQL.
 
@@ -18,7 +18,24 @@ Este repositorio coordina infraestructura, despliegue y evidencia de EP03. El [d
 | Reseñas | [foodgo-ms-resenas](https://github.com/jhoramirez-afk/foodgo-ms-resenas) | Resena → RespuestaResena |
 | Registro | [foodgo-eureka-server](https://github.com/AlexanderLlanten/foodgo-eureka-server) | Catálogo de instancias |
 
-## Componentes EP03
+## Entrega final (EFT)
+
+La [guía operativa del examen](docs/EFT-Pruebas-y-grabacion.md) reúne la preparación,
+las colecciones y las comprobaciones necesarias. Las pruebas locales y los resultados
+cloud se identifican por separado; una evidencia previa no prueba disponibilidad actual.
+
+![Arquitectura implementada](docs/diagrama/FoodGo_Arquitectura.png)
+
+[Fuente editable Draw.io](docs/diagrama/FoodGo_Arquitectura.drawio).
+La propuesta original de EP01 se conserva en [docs/diagrama/EP01](docs/diagrama/EP01/).
+
+Las colecciones del examen están en [postman/eft](postman/eft/). Sus archivos no contienen
+credenciales. El [flujo de trabajo Git](docs/GIT_WORKFLOW.md) distingue main, develop y feature.
+Los cambios exclusivamente documentales, de Postman o de CI se validan sin desplegar AWS.
+El despliegue cloud sigue automatizado para cambios de sus componentes y disponible
+mediante workflow_dispatch cuando exista autorización y una sesión vigente del laboratorio.
+
+## Componentes desplegados
 
 ```mermaid
 flowchart LR

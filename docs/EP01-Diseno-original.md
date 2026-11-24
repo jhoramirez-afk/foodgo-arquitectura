@@ -1,3 +1,5 @@
+> Documento histórico de la propuesta EP01. La arquitectura implementada está en el README y en diagrama/FoodGo_Arquitectura.png.
+
 # FoodGo — Arquitectura de Microservicios
 
 **Evaluación Parcial N°1 · JVY0101 — Java: Diseño y Construcción de Soluciones Nativas en Nube**
@@ -32,9 +34,9 @@ entrega.
 ## 3. Diagrama de arquitectura
 
 El diagrama general del sistema (componentes, patrones, flujos de comunicación, seguridad y flujos de
-datos críticos) está en [`docs/diagrama/FoodGo_Arquitectura.drawio`](docs/diagrama/FoodGo_Arquitectura.drawio)
+datos críticos) está en [`diagrama/EP01/FoodGo_Arquitectura.drawio`](diagrama/EP01/FoodGo_Arquitectura.drawio)
 (editable en [app.diagrams.net](https://app.diagrams.net)) y su export como imagen en
-`docs/diagrama/FoodGo_Arquitectura.png` — **recuerden exportar el PNG antes de entregar**, es lo
+`diagrama/EP01/FoodGo_Arquitectura.jpg` — **recuerden exportar el PNG antes de entregar**, es lo
 que se copia directamente en AVA.
 
 ## 4. Requisitos funcionales (RF)
@@ -127,7 +129,7 @@ Cliente confirma pedido
 | Indicador | Dónde se evidencia |
 |---|---|
 | IE1, IE2, IE3 (requisitos y elección de microservicios) | Secciones 4, 5 y 6 de este README + video |
-| IE4 (diagrama claro) | `docs/diagrama/FoodGo_Arquitectura.drawio` |
+| IE4 (diagrama claro) | `diagrama/EP01/FoodGo_Arquitectura.drawio` |
 | IE5 (patrones de diseño) | Sección 7 + diagrama |
 | IE6 (flujos y tecnologías cloud) | Sección 9 + diagrama |
 | IE7 (seguridad) | Sección 8 + diagrama |
@@ -138,7 +140,7 @@ Cliente confirma pedido
 ## 11. Entrega final en AVA
 
 ```
-Diagrama: [imagen PNG adjunta, exportada de docs/diagrama/FoodGo_Arquitectura.drawio]
+Diagrama: [imagen PNG adjunta, exportada de diagrama/EP01/FoodGo_Arquitectura.drawio]
 
 Repositorios (9 enlaces):
 - Arquitectura (este repo): https://github.com/jhoramirez-afk/foodgo-arquitectura
